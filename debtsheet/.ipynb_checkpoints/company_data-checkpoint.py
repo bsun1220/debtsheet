@@ -41,41 +41,51 @@ class CompanyData:
         return {"desc":desc, "phone":phone, "address":addr, "website":website, "name":name}
     
     def get_shareholders(self):
-        institution = self.ticker.institutional_holders.loc[:, ["Holder", "Date Reported", "% Out"]]
-        mf = self.ticker.mutualfund_holders.loc[:, ["Holder", "Date Reported", "% Out"]]
-        
-        data = pd.DataFrame(self.api_call("insiderHolders", "holders"))
-        data = data[data["transactionDescription"] == "Purchase"]
-        data["Holder"] = data["name"]
-        data["% Out"] = np.nan
-        data["Date Reported"] = np.nan
-        
-        if(not "positionIndirect" in data.columns):
-            data["positionIndirect"] = np.nan
-            data["positionIndirectDate"] = np.nan
-        if(not "positionDirect" in data.columns):
-            data["positionDirect"] = np.nan
-            data["positionDirectDate"] = np.nan
-        
-        for i, _ in data.iterrows():
-            if(not pd.isna(data.loc[i]["positionIndirect"]) and (not pd.isna(data.loc[i]["positionIndirectDate"]))):
-                data.loc[i,"% Out"] = data.loc[int(i)]["positionIndirect"]["raw"]
-                data.loc[i,"Date Reported"] = data.loc[i,"positionIndirectDate"]["fmt"]
-            elif (not pd.isna(data.loc[i]["positionDirect"]) and (not pd.isna(data.loc[i]["positionDirectDate"]))):
-                data.loc[i,"% Out"] = int(data.loc[i,"positionDirect"]["raw"])
-                data.loc[i,"Date Reported"] = data.loc[i,"positionDirectDate"]["fmt"]
-        
-        data = data[["Holder","Date Reported", "% Out"]].dropna()
-        data["type"] = "insider"
-        data["% Out"] = data["% Out"]/self.get_share_data()
-        
+        try:
+            institution = self.ticker.institutional_holders.loc[:, ["Holder", "Date Reported", "% Out"]]
+        except:
+            institution = pd.DataFrame(columns = ["Holder", "Date Reported", "% Out"])
+        try:
+            mf = self.ticker.mutualfund_holders.loc[:, ["Holder", "Date Reported", "% Out"]]
+        except:
+            mf = pd.DataFrame(columns = ["Holder", "Date Reported", "% Out"])
         
         institution["type"] = "institution"
         mf["type"] = "mutual fund"
         
         df = mf.append(institution, ignore_index = True)
         
-        df = df.append(data, ignore_index = True)
+        data = pd.DataFrame(self.api_call("insiderHolders", "holders"))
+        
+        try:
+            data = data[data["transactionDescription"] == "Purchase"]
+            data["Holder"] = data["name"]
+            data["% Out"] = np.nan
+            data["Date Reported"] = np.nan
+        
+            if(not "positionIndirect" in data.columns):
+                data["positionIndirect"] = np.nan
+                data["positionIndirectDate"] = np.nan
+            if(not "positionDirect" in data.columns):
+                data["positionDirect"] = np.nan
+                data["positionDirectDate"] = np.nan
+        
+            for i, _ in data.iterrows():
+                if(not pd.isna(data.loc[i]["positionIndirect"]) and (not pd.isna(data.loc[i]["positionIndirectDate"]))):
+                    data.loc[i,"% Out"] = data.loc[int(i)]["positionIndirect"]["raw"]
+                    data.loc[i,"Date Reported"] = data.loc[i,"positionIndirectDate"]["fmt"]
+                elif (not pd.isna(data.loc[i]["positionDirect"]) and (not pd.isna(data.loc[i]["positionDirectDate"]))):
+                    data.loc[i,"% Out"] = int(data.loc[i,"positionDirect"]["raw"])
+                    data.loc[i,"Date Reported"] = data.loc[i,"positionDirectDate"]["fmt"]
+        
+            data = data[["Holder","Date Reported", "% Out"]].dropna()
+            data["type"] = "insider"
+            data["% Out"] = data["% Out"]/self.get_share_data()
+            df = df.append(data, ignore_index = True)
+            
+        except:
+            pass
+        
         df = df.sort_values("% Out", ascending = False, ignore_index = True)
         
         length = min(len(df), 10)
